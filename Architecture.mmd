@@ -1,0 +1,247 @@
+graph TB
+    subgraph Frontend["Frontend Layer"]
+        TS[TypeScript Client<br/>React/Vue/Angular<br/>gRPC-Web]
+    end
+
+    subgraph Gateway["API Gateway Layer"]
+        direction TB
+        LB[Load Balancer<br/>Nginx/HAProxy]
+        PROXY[gRPC-Web Proxy<br/>Envoy]
+        AUTHGW[Auth Gateway<br/>JWT Validation]
+        
+        LB --> PROXY
+        PROXY --> AUTHGW
+    end
+
+    subgraph CoreServices["Core Business Services"]
+        direction TB
+        
+        subgraph UserMgmt["User Management :50051"]
+            US1[User CRUD]
+            US2[Profile Management]
+            US3[Preferences]
+        end
+        
+        subgraph ContactMgmt["Contact Management :50052"]
+            CS1[Contact CRUD]
+            CS2[Contact Search]
+            CS3[Contact Merge]
+            CS4[Import/Export]
+        end
+        
+        subgraph LeadMgmt["Lead Management :50053"]
+            LS1[Lead CRUD]
+            LS2[Lead Assignment]
+            LS3[Lead Scoring]
+            LS4[Lead Conversion]
+        end
+        
+        subgraph OpportunityMgmt["Opportunity Management :50054"]
+            OS1[Deal Pipeline]
+            OS2[Stage Management]
+            OS3[Win/Loss Analysis]
+            OS4[Forecasting]
+        end
+        
+        subgraph AccountMgmt["Account Management :50055"]
+            AS1[Account CRUD]
+            AS2[Account Hierarchy]
+            AS3[Territory Management]
+        end
+        
+        subgraph TaskMgmt["Task & Activity :50056"]
+            TS1[Task CRUD]
+            TS2[Calendar Integration]
+            TS3[Activity Timeline]
+            TS4[Reminders]
+        end
+    end
+
+    subgraph SupportServices["Supporting Services"]
+        direction TB
+        
+        subgraph Notification["Notification Service :50057"]
+            NS1[Email Notifications]
+            NS2[SMS Alerts]
+            NS3[Push Notifications]
+            NS4[In-App Notifications]
+        end
+        
+        subgraph Reporting["Reporting & Analytics :50058"]
+            RS1[Custom Reports]
+            RS2[Dashboards]
+            RS3[Data Export]
+            RS4[BI Integration]
+        end
+        
+        subgraph FileStorage["File Service :50059"]
+            FS1[File Upload]
+            FS2[Document Management]
+            FS3[Version Control]
+            FS4[CDN Integration]
+        end
+        
+        subgraph AuditLog["Audit Service :50060"]
+            AU1[Activity Logging]
+            AU2[Change Tracking]
+            AU3[Compliance Reports]
+            AU4[Data Retention]
+        end
+    end
+
+    subgraph Security["Security & Authorization"]
+        direction TB
+        
+        subgraph RBAC["RBAC Service :50061"]
+            RB1[Role Management]
+            RB2[Permission Engine]
+            RB3[Policy Evaluation]
+        end
+        
+        subgraph AuthService["Authentication :50062"]
+            AT1[Login/Logout]
+            AT2[SSO Integration]
+            AT3[MFA]
+            AT4[Session Management]
+        end
+    end
+
+    subgraph DataLayer["Data Persistence Layer"]
+        direction LR
+        
+        PG[(PostgreSQL<br/>Transactional Data<br/>Users, Contacts, Leads<br/>Opportunities, Accounts)]
+        
+        REDIS[(Redis<br/>Cache Layer<br/>Sessions, Permissions<br/>Rate Limiting)]
+        
+        MONGO[(MongoDB<br/>Document Store<br/>Audit Logs, Files<br/>Unstructured Data)]
+        
+        ES[(Elasticsearch<br/>Search Engine<br/>Full-text Search<br/>Analytics)]
+    end
+
+    subgraph MessageBus["Message Queue & Events"]
+        direction TB
+        
+        MQ[RabbitMQ/Kafka<br/>Message Broker]
+        
+        subgraph Topics["Event Topics"]
+            T1[user.events]
+            T2[contact.events]
+            T3[lead.events]
+            T4[opportunity.events]
+            T5[notification.events]
+        end
+        
+        MQ --> Topics
+    end
+
+    subgraph Infrastructure["Infrastructure Services"]
+        direction TB
+        
+        SD[Service Discovery<br/>Consul/Etcd<br/>Health Checks]
+        
+        CONFIG[Config Server<br/>Centralized Config<br/>Feature Flags]
+        
+        subgraph Monitoring["Observability"]
+            PROM[Prometheus<br/>Metrics]
+            JAEGER[Jaeger<br/>Distributed Tracing]
+            ELK[ELK Stack<br/>Log Aggregation]
+        end
+    end
+
+    %% Frontend to Gateway
+    TS -->|gRPC-Web<br/>HTTPS| LB
+
+    %% Gateway to Auth
+    AUTHGW -->|Validate Token| AuthService
+    AUTHGW -->|Check Permissions| RBAC
+
+    %% Gateway to Core Services
+    AUTHGW --> CoreServices
+
+    %% Core Services to RBAC
+    UserMgmt -->|Authorization Check| RBAC
+    ContactMgmt -->|Authorization Check| RBAC
+    LeadMgmt -->|Authorization Check| RBAC
+    OpportunityMgmt -->|Authorization Check| RBAC
+    AccountMgmt -->|Authorization Check| RBAC
+    TaskMgmt -->|Authorization Check| RBAC
+
+    %% Core Services to Database
+    UserMgmt --> PG
+    ContactMgmt --> PG
+    LeadMgmt --> PG
+    OpportunityMgmt --> PG
+    AccountMgmt --> PG
+    TaskMgmt --> PG
+
+    %% Core Services to Cache
+    UserMgmt --> REDIS
+    ContactMgmt --> REDIS
+    LeadMgmt --> REDIS
+    RBAC --> REDIS
+    AuthService --> REDIS
+
+    %% Core Services to Search
+    ContactMgmt --> ES
+    LeadMgmt --> ES
+    OpportunityMgmt --> ES
+    AccountMgmt --> ES
+
+    %% Core Services to Message Queue
+    UserMgmt -->|Publish Events| MQ
+    ContactMgmt -->|Publish Events| MQ
+    LeadMgmt -->|Publish Events| MQ
+    OpportunityMgmt -->|Publish Events| MQ
+    AccountMgmt -->|Publish Events| MQ
+    TaskMgmt -->|Publish Events| MQ
+
+    %% Message Queue to Support Services
+    MQ -->|Subscribe| Notification
+    MQ -->|Subscribe| AuditLog
+    MQ -->|Subscribe| Reporting
+
+    %% Support Services to Storage
+    FileStorage --> MONGO
+    AuditLog --> MONGO
+    AuditLog --> ES
+    Reporting --> PG
+    Reporting --> ES
+
+    %% Service Discovery
+    CoreServices -.->|Register/Discover| SD
+    SupportServices -.->|Register/Discover| SD
+    Security -.->|Register/Discover| SD
+
+    %% Configuration
+    CoreServices -.->|Fetch Config| CONFIG
+    SupportServices -.->|Fetch Config| CONFIG
+
+    %% Monitoring
+    CoreServices -.->|Metrics| PROM
+    SupportServices -.->|Metrics| PROM
+    CoreServices -.->|Traces| JAEGER
+    CoreServices -.->|Logs| ELK
+
+    style Frontend fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    style Gateway fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    style CoreServices fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+    style SupportServices fill:#fff9c4,stroke:#fbc02d,stroke-width:2px
+    style Security fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+    style DataLayer fill:#ffebee,stroke:#c62828,stroke-width:2px
+    style MessageBus fill:#ffe0b2,stroke:#e64a19,stroke-width:2px
+    style Infrastructure fill:#f0f4c3,stroke:#689f38,stroke-width:2px
+    
+    style UserMgmt fill:#c8e6c9
+    style ContactMgmt fill:#c8e6c9
+    style LeadMgmt fill:#c8e6c9
+    style OpportunityMgmt fill:#c8e6c9
+    style AccountMgmt fill:#c8e6c9
+    style TaskMgmt fill:#c8e6c9
+    
+    style Notification fill:#fff59d
+    style Reporting fill:#fff59d
+    style FileStorage fill:#fff59d
+    style AuditLog fill:#fff59d
+    
+    style RBAC fill:#e1bee7
+    style AuthService fill:#e1bee7
